@@ -42,17 +42,17 @@ if __name__ == "__main__":
     p = argparse.ArgumentParser()
     p.add_argument("--dataset",    default="roneneldan/TinyStories")
     p.add_argument("--max_docs",   type=int, default=None, help="subsample training docs")
-    p.add_argument("--block_size", type=int, default=256)   # GPT-2: 1024
-    p.add_argument("--n_layer",    type=int, default=4)     # GPT-2 small: 12
-    p.add_argument("--n_head",     type=int, default=4)     # GPT-2 small: 12
-    p.add_argument("--n_embd",     type=int, default=256)   # GPT-2 small: 768
-    p.add_argument("--batch_size", type=int, default=8)     # micro-batch; 8 fits a 4GB card
-    p.add_argument("--grad_accum", type=int, default=8)     # effective batch = 8*8*256 = 16k tokens
-    p.add_argument("--lr",         type=float, default=6e-4)
-    p.add_argument("--warmup",     type=int, default=200)
-    p.add_argument("--steps",      type=int, default=5000)
+    p.add_argument("--block_size", type=int, default=512)   # GPT-2: 1024
+    p.add_argument("--n_layer",    type=int, default=8)     # GPT-2 small: 12
+    p.add_argument("--n_head",     type=int, default=8)     # GPT-2 small: 12
+    p.add_argument("--n_embd",     type=int, default=512)   # GPT-2 small: 768
+    p.add_argument("--batch_size", type=int, default=32)     # micro-batch; 8 fits a 4GB card
+    p.add_argument("--grad_accum", type=int, default=2)     # effective batch = 8*8*256 = 16k tokens
+    p.add_argument("--lr",         type=float, default=1e-3)
+    p.add_argument("--warmup",     type=int, default=500)
+    p.add_argument("--steps",      type=int, default=15000)
     p.add_argument("--eval_every", type=int, default=250)
-    p.add_argument("--out",        default="ckpt")
+    p.add_argument("--out",        default="ckpt_8x512")
     p.add_argument("--resume",     action="store_true")
     p.add_argument("--compile",    action="store_true")
     p.add_argument("--bf16",       action="store_true", help="force bf16 autocast (auto on CUDA)")
