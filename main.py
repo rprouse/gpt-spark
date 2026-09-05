@@ -3,9 +3,9 @@ main.py - GPT-2 style pretraining with the standard tooling.
 
     uv sync
 
-    uv run main.py                                  # TinyStories, ~16M params
+    uv run main.py                                  # TinyStories, ~51M params
     uv run main.py --max_docs 50000 --steps 500     # quick smoke test
-    uv run main.py --n_layer 8 --n_embd 512 --n_head 8 --steps 20000
+    uv run main.py --n_layer 12 --n_embd 768 --n_head 12 --out ckpt_12x768   # GPT-2 small shape
     uv run main.py --resume --steps 30000           # continue a run
     uv run main.py --sample "Once upon a time"      # generate from checkpoint
     uv run tensorboard --logdir runs
@@ -46,8 +46,8 @@ if __name__ == "__main__":
     p.add_argument("--n_layer",    type=int, default=8)     # GPT-2 small: 12
     p.add_argument("--n_head",     type=int, default=8)     # GPT-2 small: 12
     p.add_argument("--n_embd",     type=int, default=512)   # GPT-2 small: 768
-    p.add_argument("--batch_size", type=int, default=32)     # micro-batch; 8 fits a 4GB card
-    p.add_argument("--grad_accum", type=int, default=2)     # effective batch = 8*8*256 = 16k tokens
+    p.add_argument("--batch_size", type=int, default=32)    # micro-batch; lower this first on OOM
+    p.add_argument("--grad_accum", type=int, default=2)     # effective batch = 32*2*512 = 32k tokens
     p.add_argument("--lr",         type=float, default=1e-3)
     p.add_argument("--warmup",     type=int, default=500)
     p.add_argument("--steps",      type=int, default=15000)
