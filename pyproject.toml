@@ -1,0 +1,31 @@
+[project]
+name = "gpt-spark"
+version = "0.1.0"
+description = "A GPT-2 style large language model."
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+    "datasets>=3.0.0",
+    "numpy>=2.5.2",
+    "tensorboard>=2.21.0",
+    "torch[device-gfx1151]==2.13.0+rocm10.0.0",
+    "torchaudio==2.11.0.2+rocm10.0.0",
+    "torchvision[device-gfx1151]==0.28.0+rocm10.0.0",
+    "tqdm>=4.70.0",
+    "transformers>=4.57.6",
+]
+
+[tool.uv]
+environments = ["sys_platform == 'win32'"]
+index-strategy = "unsafe-best-match"
+override-dependencies = ["triton ; sys_platform == 'linux'"]
+
+[tool.uv.sources]
+torch = { index = "rocm" }
+torchvision = { index = "rocm" }
+torchaudio = { index = "rocm" }
+fsspec = { index = "pypi" }
+
+[[tool.uv.index]]
+name = "rocm"
+url = "https://stable.repo.amd.com/rocm/whl-next/"
