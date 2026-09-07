@@ -105,7 +105,11 @@ if __name__ == "__main__":
         # `tok` is never defined, so a closure over it would NameError in the worker.
         # fn_kwargs is pickled and shipped with the job, so it travels by value.
         def tokenize(batch, tok):
-            ids = tok(batch["text"])["input_ids"]
+            # verbose=False: the tokenizer carries GPT-2's original model_max_length of
+            # 1024 and warns on any longer document, assuming it is about to be fed to a
+            # model. It isn't - every doc is concatenated into one flat stream below and
+            # re-cut into block_size windows, so document length is irrelevant here.
+            ids = tok(batch["text"], verbose=False)["input_ids"]
             return {"ids": [x + [tok.eos_token_id] for x in ids],
                     "len": [len(x) + 1 for x in ids]}
 
@@ -135,6 +139,12 @@ if __name__ == "__main__":
                          bos_token_id=tok.eos_token_id, eos_token_id=tok.eos_token_id,
                          attn_implementation="sdpa")   # constructor takes it via config, not as a kwarg
         model = GPT2LMHeadModel(cfg)
+    # HF infers the loss by matching the class name against LOSS_MAPPING keys
+    # ("ForCausalLM", "ForMaskedLM", ...). GPT2LMHeadModel predates that convention,
+    # matches nothing, and falls back to ForCausalLMLoss with a warning - the right
+    # loss, reached noisily. Name it so the inference never runs. Note this lives on
+    # the model, not the config, despite what the warning text claims.
+    model.loss_type = "ForCausalLM"
     model.to(device)
     raw_model = model
     if args.compile:
