@@ -5,7 +5,7 @@ A small GPT-2 style language model, trained from scratch on
 
 This is a **learning project**. The goal is not a useful model, it is to
 see every moving part of a real pretraining run in one readable file
-([main.py](main.py), ~220 lines) and be able to change any of them.
+([gpt_train.py](gpt_train.py), ~220 lines) and be able to change any of them.
 
 The deliberate design choice: *don't reimplement the transformer*. The
 architecture, tokenizer, LR schedule and sampling all come from Hugging Face
@@ -18,10 +18,10 @@ schedule the learning rate, evaluate, and checkpoint.
 ```bash
 uv sync
 
-uv run main.py                                  # train with the defaults (51M params)
-uv run main.py --max_docs 50000 --steps 500     # quick smoke test
-uv run main.py --resume --steps 30000           # continue where a run left off
-uv run main.py --sample "Once upon a time"      # generate only, no training
+uv run gpt_train.py                                  # train with the defaults (51M params)
+uv run gpt_train.py --max_docs 50000 --steps 500     # quick smoke test
+uv run gpt_train.py --resume --steps 30000           # continue where a run left off
+uv run gpt_train.py --sample "Once upon a time"      # generate only, no training
 uv run tensorboard --logdir runs                # watch loss / lr / sample text
 ```
 
@@ -38,7 +38,7 @@ handles the rest. The code itself is device-agnostic and falls back to CPU.
 
 ## What the model is
 
-The defaults in [main.py](main.py) build a **51.2M parameter** GPT-2 variant:
+The defaults in [gpt_train.py](gpt_train.py) build a **51.2M parameter** GPT-2 variant:
 
 |                          | this project     | GPT-2 small |
 | ------------------------ | ---------------- | ----------- |
@@ -59,12 +59,12 @@ so the run is data-rich rather than overfitting-prone, and regularisation would
 just slow learning down.
 
 At 15,000 iterations, the loss was down to *1.321* so I ran again with
-`uv run main.py --resume --steps 30000`. This dropped the loss slightly to *1.270*.
+`uv run gpt_train.py --resume --steps 30000`. This dropped the loss slightly to *1.270*.
 
 This produces somewhat coherent text. To improve, I might want to custom train a BPE tokenizer for the smaller vocabulary of this training text.
 
 ```sh
-uv run .\main.py --sample "It was a cold fall morning"
+uv run .\gpt_train.py --sample "It was a cold fall morning"
 ```
 
 It was a cold fall morning. The wind was blowing and it was bitter outside. The little girl was sad and started to cry.
@@ -77,7 +77,7 @@ The little girl was so happy. She felt so happy that she hugged her mum. Then sh
 
 ## How the code works
 
-[main.py](main.py) runs top to bottom inside a single `if __name__ == "__main__":`
+[gpt_train.py](gpt_train.py) runs top to bottom inside a single `if __name__ == "__main__":`
 block. Each section is described below.
 
 ### 1. The `__main__` guard is load-bearing
@@ -88,11 +88,11 @@ the guard, every worker would re-import torch, build the model on the GPU, and
 call `build_data()` again — spawning another generation of workers, recursively.
 
 The same constraint explains why the tokenizer is passed to `tokenize()` through
-`fn_kwargs` instead of being captured as a closure ([main.py:103-113](main.py#L103-L113)):
+`fn_kwargs` instead of being captured as a closure ([gpt_train.py:103-113](gpt_train.py#L103-L113)):
 inside a worker, `tok` was never defined, so a closure over it would `NameError`.
 `fn_kwargs` is pickled and travels *by value*.
 
-### 2. Data: pack once, sample forever ([main.py:84-126](main.py#L84-L126))
+### 2. Data: pack once, sample forever ([gpt_train.py:84-126](gpt_train.py#L84-L126))
 
 `build_data()` follows the nanoGPT approach:
 
@@ -115,7 +115,7 @@ the tradeoff: maximum data efficiency, slightly noisy document boundaries.
 Note the labels: `model(x, labels=x)`. Hugging Face shifts labels internally, so
 predicting token *n+1* from tokens *≤n* needs no manual offsetting.
 
-### 3. Mixed precision ([main.py:65-76](main.py#L65-L76))
+### 3. Mixed precision ([gpt_train.py:65-76](gpt_train.py#L65-L76))
 
 Chosen automatically:
 
@@ -129,7 +129,7 @@ Chosen automatically:
 The `GradScaler` stays in the loop unconditionally but is a no-op when disabled,
 so one code path serves all three cases.
 
-### 4. Optimiser ([main.py:165-172](main.py#L165-L172))
+### 4. Optimiser ([gpt_train.py:165-172](gpt_train.py#L165-L172))
 
 AdamW with `betas=(0.9, 0.95)`, the GPT-2 convention, a shorter second-moment
 memory than PyTorch's `0.999` default.
@@ -142,7 +142,7 @@ Learning rate follows a cosine schedule with 500 warmup steps. Warmup matters
 because Adam's second-moment estimates are unreliable in the first few dozen
 steps; a full-size LR there can wreck the model before it stabilises.
 
-### 5. The training step ([main.py:201-222](main.py#L201-L222))
+### 5. The training step ([gpt_train.py:201-222](gpt_train.py#L201-L222))
 
 ```
 for each step:
@@ -180,7 +180,7 @@ loss tells you it's improving, but only the samples tell you *how*: gibberish �
 word-shaped noise → grammatical nonsense → actual little stories.
 
 `sample()` reads the context window off `raw_model.config`, not off `args`
-([main.py:147-160](main.py#L147-L160)). GPT-2 has *learned* position embeddings for
+([gpt_train.py:147-160](gpt_train.py#L147-L160)). GPT-2 has *learned* position embeddings for
 exactly `n_positions` slots, so prompt + generated tokens must fit inside them,
 overrunning indexes off the end of `wpe`, which is a hard abort in ROCm's
 flash-attention kernel rather than a clean Python error.
@@ -213,7 +213,7 @@ count — the things `--resume` needs but a released model doesn't.
 ## Layout
 
 ```
-main.py          the entire project
+gpt_train.py     the entire project
 pyproject.toml   ROCm-pinned dependencies (uv)
 ckpt_8x512/      current 8-layer × 512-dim checkpoint + token cache
 ckpt/            an earlier run's checkpoint
@@ -232,7 +232,7 @@ fully reproducible from the code.
   the samples stop being gibberish.
 - **Turn `--compile` on** and measure the step-time difference against the
   one-time compilation cost.
-- **Resolve the open `TODO(you)`** at [main.py:95-101](main.py#L95-L101):
+- **Resolve the open `TODO(you)`** at [gpt_train.py:95-101](gpt_train.py#L95-L101):
   `--max_docs` currently shrinks the *train* split only, so a 2000-doc smoke test
   still tokenises all 22k validation docs. 0.4M train tokens against 4.8M val,
   with that tokenisation dominating startup. The tradeoff is real: a bigger

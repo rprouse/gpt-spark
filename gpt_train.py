@@ -1,13 +1,13 @@
 """
-main.py - GPT-2 style pretraining with the standard tooling.
+gpt_train.py - GPT-2 style pretraining with the standard tooling.
 
     uv sync
 
-    uv run main.py                                  # TinyStories, ~51M params
-    uv run main.py --max_docs 50000 --steps 500     # quick smoke test
-    uv run main.py --n_layer 12 --n_embd 768 --n_head 12 --out ckpt_12x768   # GPT-2 small shape
-    uv run main.py --resume --steps 30000           # continue a run
-    uv run main.py --sample "Once upon a time"      # generate from checkpoint
+    uv run gpt_train.py                                  # TinyStories, ~51M params
+    uv run gpt_train.py --max_docs 50000 --steps 500     # quick smoke test
+    uv run gpt_train.py --n_layer 12 --n_embd 768 --n_head 12 --out ckpt_12x768   # GPT-2 small shape
+    uv run gpt_train.py --resume --steps 30000           # continue a run
+    uv run gpt_train.py --sample "Once upon a time"      # generate from checkpoint
     uv run tensorboard --logdir runs
 
 Libraries doing the work:
