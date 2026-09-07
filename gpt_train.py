@@ -152,9 +152,11 @@ if __name__ == "__main__":
         ROCm's flash-attention kernel). Read the window off the model, not off args,
         so --sample against a checkpoint uses that checkpoint's real size."""
         raw_model.eval()
-        ids = tok(prompt, return_tensors="pt").input_ids.to(device)
-        n = max(1, min(n, raw_model.config.n_positions - ids.shape[1]))
-        out = raw_model.generate(ids, max_new_tokens=n, do_sample=True, temperature=0.8,
+        # Keep the attention_mask, don't just grab input_ids: pad_token == eos_token
+        # here, so generate() cannot infer the mask from the ids alone and warns.
+        enc = tok(prompt, return_tensors="pt").to(device)
+        n = max(1, min(n, raw_model.config.n_positions - enc.input_ids.shape[1]))
+        out = raw_model.generate(**enc, max_new_tokens=n, do_sample=True, temperature=0.8,
                                  top_k=50, top_p=0.95, pad_token_id=tok.eos_token_id)
         raw_model.train()
         return tok.decode(out[0], skip_special_tokens=True)
