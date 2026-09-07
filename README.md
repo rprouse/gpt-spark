@@ -22,6 +22,7 @@ uv run gpt_train.py                                  # train with the defaults (
 uv run gpt_train.py --max_docs 50000 --steps 500     # quick smoke test
 uv run gpt_train.py --resume --steps 30000           # continue where a run left off
 uv run gpt_train.py --sample "Once upon a time"      # generate only, no training
+uv run eval_ppl.py                                   # full val-set perplexity of a checkpoint
 uv run tensorboard --logdir runs                # watch loss / lr / sample text
 ```
 
@@ -58,10 +59,47 @@ Dropout is set to `0.0` throughout. TinyStories is large relative to this model,
 so the run is data-rich rather than overfitting-prone, and regularisation would
 just slow learning down.
 
-At 15,000 iterations, the loss was down to *1.321* so I ran again with
-`uv run gpt_train.py --resume --steps 30000`. This dropped the loss slightly to *1.270*.
+## Results
 
-This produces somewhat coherent text. To improve, I might want to custom train a BPE tokenizer for the smaller vocabulary of this training text.
+At 15,000 steps train loss was down to *1.321*, so I ran again with
+`uv run gpt_train.py --resume --steps 30000`, which took it to *1.270*.
+
+Those are **train** loss, though, and train loss is the number that flatters you.
+Validation loss over the same stretch went *1.319 → 1.308*: the second 15,000 steps,
+half the total compute, bought about *0.01* nats.
+
+The learning-rate curve says why. `--steps` sets the cosine schedule's horizon as
+well as the step count, so resuming with `--steps 30000` built a *fresh* 30,000-step
+cosine and then dropped the saved scheduler state into it at step 15,000. The LR
+jumped from ~0 — the end of the first cosine — back up to *5.13e-4*, the midpoint of
+the new one, and decayed all over again. The model spent the second run relearning
+ground it had already covered. One continuous 30,000-step run would almost certainly
+have landed lower for the same twelve hours of GPU time.
+
+Worth knowing about `--resume`: it is only cheap when you resume to the *same*
+`--steps` you originally planned for. Changing the horizon silently reshapes the
+schedule underneath the optimiser state.
+
+For a number worth quoting, [eval_ppl.py](eval_ppl.py) makes one pass over the whole
+validation split instead of sampling 20 batches:
+
+```sh
+uv run eval_ppl.py
+# val loss (nats/token) 1.3029
+# val perplexity        3.6799
+# bits per token        1.8797
+```
+
+The training loop's cheap estimate ranged *1.287–1.321* across the last ten
+checkpoints, and the full-set figure sits inside that band — so the sampled estimate
+was unbiased, just far too noisy to report its best value as a result. Picking the
+minimum of a noisy series is how honest people end up quoting optimistic numbers.
+
+This produces somewhat coherent text. The clearest next improvement is a
+corpus-specific BPE vocabulary: reusing GPT-2's 50257-token vocabulary puts *50.2%*
+of the parameters in an embedding table covering CJK, emoji and other scripts that
+never occur in TinyStories. A smaller vocabulary moves that budget into the
+transformer blocks instead.
 
 ```sh
 uv run .\gpt_train.py --sample "It was a cold fall morning"
@@ -214,6 +252,8 @@ count — the things `--resume` needs but a released model doesn't.
 
 ```
 gpt_train.py     the entire project
+eval_ppl.py      full-validation-set perplexity for a checkpoint
+MODEL_CARD.md    Hugging Face card for ckpt_8x512 (uploaded as README.md)
 pyproject.toml   ROCm-pinned dependencies (uv)
 ckpt_8x512/      current 8-layer × 512-dim checkpoint + token cache
 ckpt/            an earlier run's checkpoint
